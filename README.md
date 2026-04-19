@@ -2,12 +2,10 @@
 
 ## Workflow function is defined in dags/src/workflow
 
-### List
-
-Step1. Clean data
-Step2. Check data drift
-Step3. Retrain model
-Step4. Evaluate and promote model
+- Step1. Clean data
+- Step2. Check data drift
+- Step3. Retrain model
+- Step4. Evaluate and promote model
 
 ## Utility function
 
