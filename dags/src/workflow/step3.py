@@ -9,6 +9,8 @@ def retrain_model(**ctx):
     import torch.optim as optim
     from sklearn.metrics import accuracy_score, f1_score
     from sklearn.model_selection import train_test_split
+    from src.utility.dataset import MentalHealthDataset
+    from src.utility.wrapper import BertSentimentWrapper
     from torch.utils.data import DataLoader
     from transformers import AutoModelForSequenceClassification, AutoTokenizer
     from utility.dataset import MentalHealthDataset

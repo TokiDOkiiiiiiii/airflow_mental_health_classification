@@ -2,8 +2,7 @@ def load_and_clean_data(**ctx):
     import os
 
     import pandas as pd
-
-    from utility.preprocessing import cleaning_pipeline
+    from src.utility.preprocessing import cleaning_pipeline
 
     TRAIN_PATH = os.environ["TRAIN_PATH"]
     DATA_PATH = os.environ["DATA_PATH"]

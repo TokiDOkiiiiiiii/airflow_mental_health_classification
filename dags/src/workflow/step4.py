@@ -3,9 +3,8 @@ def evaluate_and_promote(**ctx):
 
     import mlflow
     import pandas as pd
-
-    from deployment.update import update_deployment_endpoint
-    from utility.testing import score_model
+    from src.deployment.update import update_deployment_endpoint
+    from src.utility.testing import score_model
 
     MLFLOW_URI = os.environ["MLFLOW_TRACKING_URI"]
     REGISTERED_MODEL_NAME = os.environ["REGISTERED_MODEL_NAME"]
