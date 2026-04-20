@@ -189,7 +189,7 @@ def retrain_model(**ctx):
                 {
                     "pip": [
                         "mlflow>=3.10",
-                        "torch>=2.10",
+                        "torch==2.2.2+cu121",
                         "transformers>=4.38",
                         "pandas",
                         "numpy",
