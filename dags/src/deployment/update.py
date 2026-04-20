@@ -28,3 +28,7 @@ def update_deployment_endpoint():
         flavor="python_function",
         config=config,
     )
+
+
+if __name__ == "__main__":
+    update_deployment_endpoint()
