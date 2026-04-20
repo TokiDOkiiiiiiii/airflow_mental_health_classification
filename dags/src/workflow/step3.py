@@ -203,7 +203,7 @@ def retrain_model(**ctx):
         print("Uploading model to MLflow (S3 artifact store)...")
 
         model_info = mlflow.pyfunc.log_model(
-            artifact_path="bert_sentiment_model",
+            name="bert_sentiment_model",
             python_model=BertSentimentWrapper(),
             artifacts=artifacts,
             conda_env=conda_env,
