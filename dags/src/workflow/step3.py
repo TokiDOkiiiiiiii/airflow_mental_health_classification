@@ -13,8 +13,6 @@ def retrain_model(**ctx):
     from src.utility.wrapper import BertSentimentWrapper
     from torch.utils.data import DataLoader
     from transformers import AutoModelForSequenceClassification, AutoTokenizer
-    from utility.dataset import MentalHealthDataset
-    from utility.wrapper import BertSentimentWrapper
 
     MODEL_NAME = os.environ["MODEL_NAME"]
     MLFLOW_URI = os.environ["MLFLOW_TRACKING_URI"]
