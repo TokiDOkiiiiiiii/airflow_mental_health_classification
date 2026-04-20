@@ -13,12 +13,12 @@ class BertSentimentWrapper(mlflow.pyfunc.PythonModel):
         import os
 
         import torch
-        from transformers import BertForSequenceClassification, BertTokenizerFast
+        from transformers import AutoModelForSequenceClassification, AutoTokenizer
 
         model_dir = context.artifacts["model_dir"]
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        self.tokenizer = BertTokenizerFast.from_pretrained(model_dir)
-        self.model = BertForSequenceClassification.from_pretrained(model_dir)
+        self.tokenizer = AutoTokenizer.from_pretrained(model_dir)
+        self.model = AutoModelForSequenceClassification.from_pretrained(model_dir)
         self.model.to(self.device)
         self.model.eval()
 
@@ -55,15 +55,11 @@ class BertSentimentWrapper(mlflow.pyfunc.PythonModel):
         )
         input_ids = encodings["input_ids"].to(self.device)
         attention_mask = encodings["attention_mask"].to(self.device)
-        token_type_ids = encodings.get(
-            "token_type_ids", torch.zeros_like(input_ids)
-        ).to(self.device)
 
         with torch.no_grad():
             logits = self.model(
                 input_ids=input_ids,
                 attention_mask=attention_mask,
-                token_type_ids=token_type_ids,
             ).logits
 
         prob = torch.softmax(logits, dim=1).cpu().numpy().tolist()
