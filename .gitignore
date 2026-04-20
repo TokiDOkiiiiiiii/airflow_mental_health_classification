@@ -1,3 +1,6 @@
 .env
 .DS_Store
 note
+__pycache__
+data/*
+logs/*
