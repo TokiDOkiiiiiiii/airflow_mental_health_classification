@@ -10,10 +10,5 @@ RUN apt-get update \
 
 USER airflow
 
-RUN pip install --no-cache-dir \
-    torch==2.2.2+cu121 \
-    torchvision==0.17.2+cu121 \
-    --index-url https://download.pytorch.org/whl/cu121
-
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
