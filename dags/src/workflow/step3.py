@@ -52,7 +52,7 @@ def retrain_model(**ctx):
         key="cleaned_path", task_ids="load_and_clean_data"
     )
     df = pd.read_parquet(cleaned_path)
-    x, y = df["text"], df["status_id"]
+    x, y = df["text"].tolist(), df["status_id"].tolist()
     x_train, x_val, y_train, y_val = train_test_split(
         x, y, test_size=0.1, stratify=y, random_state=SEED
     )
@@ -103,7 +103,12 @@ def retrain_model(**ctx):
         )
 
         best_val_loss = float("inf")
+        model.save_pretrained(best_model_path)
+        tokenizer.save_pretrained(best_model_path)
+        with open(os.path.join(best_model_path, "id2label.json"), "w") as f:
+            json.dump(ID2LABEL, f)
 
+        # Problem with training but i cant identify
         for epoch in range(EPOCHS):
             print(f"\n── Epoch {epoch + 1}/{EPOCHS} starting ──")
 
@@ -166,6 +171,7 @@ def retrain_model(**ctx):
             if avg_val < best_val_loss:
                 best_val_loss = avg_val
                 model.save_pretrained(best_model_path)
+                tokenizer.save_pretrained(best_model_path)
                 with open(os.path.join(best_model_path, "id2label.json"), "w") as f:
                     json.dump(ID2LABEL, f)
                 print("New model saved")
@@ -188,9 +194,9 @@ def retrain_model(**ctx):
                 "pip",
                 {
                     "pip": [
-                        "mlflow>=3.10",
-                        "torch==2.2.2+cu121",
-                        "transformers>=4.38",
+                        "mlflow==3.11.1",
+                        "torch==2.2.2",
+                        "transformers==4.38.0",
                         "pandas",
                         "numpy",
                         "scikit-learn",
@@ -203,9 +209,10 @@ def retrain_model(**ctx):
         print("Uploading model to MLflow (S3 artifact store)...")
 
         model_info = mlflow.pyfunc.log_model(
-            name="bert_sentiment_model",
+            artifact_path="bert_sentiment_model",
             python_model=BertSentimentWrapper(),
             artifacts=artifacts,
+            infer_code_paths=True,
             conda_env=conda_env,
             registered_model_name=REGISTERED_MODEL,
         )
