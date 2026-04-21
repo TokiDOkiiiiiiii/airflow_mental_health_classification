@@ -348,4 +348,12 @@ with DAG(
         execution_timeout=timedelta(hours=2),
     )
 
-    load_task >> drift_task >> retrain_task >> evaluate_task
+    from src.workflow.step5 import update_deployment
+
+    update_deployment = PythonOperator(
+        task_id="update_deployment",
+        python_callable=update_deployment,
+        execution_timeout=timedelta(hours=2),
+    )
+
+    load_task >> drift_task >> retrain_task >> evaluate_task >> update_deployment
