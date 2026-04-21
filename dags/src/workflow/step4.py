@@ -3,8 +3,9 @@ def evaluate_and_promote(**ctx):
 
     import mlflow
     import pandas as pd
-    from src.deployment.update import update_deployment_endpoint
-    from src.utility.testing import score_model
+    import sys
+    sys.path.insert(0, "/opt/airflow/dags/src/utility")
+    from testing import score_model
 
     MLFLOW_URI = os.environ["MLFLOW_TRACKING_URI"]
     REGISTERED_MODEL_NAME = os.environ["REGISTERED_MODEL_NAME"]

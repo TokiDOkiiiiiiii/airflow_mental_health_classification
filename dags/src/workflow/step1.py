@@ -2,7 +2,9 @@ def load_and_clean_data(**ctx):
     import os
 
     import pandas as pd
-    from src.utility.preprocessing import cleaning_pipeline
+    import sys
+    sys.path.insert(0, "/opt/airflow/dags/src/utility")
+    from preprocessing import cleaning_pipeline
 
     TRAIN_PATH = os.environ["TRAIN_PATH"]
     DATA_PATH = os.environ["DATA_PATH"]
