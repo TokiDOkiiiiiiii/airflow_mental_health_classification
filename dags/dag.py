@@ -49,7 +49,289 @@ with DAG(
     )
 
     # Retrain DistilBERT
-    from src.workflow.step3 import retrain_model
+    def retrain_model(**ctx):
+        import json
+        import os
+        import sys
+        import mlflow
+        import pandas as pd
+        import torch
+        import torch.optim as optim
+        from sklearn.metrics import accuracy_score, f1_score
+        from sklearn.model_selection import train_test_split
+        from torch.utils.data import DataLoader
+        from transformers import AutoModelForSequenceClassification, AutoTokenizer
+        sys.path.insert(0, "/opt/airflow/dags/src/utility")
+        from dataset import MentalHealthDataset
+
+
+        class BertSentimentWrapper(mlflow.pyfunc.PythonModel):
+            """
+            Wraps BERT + tokenizer so that `mlflow models serve` can use it.
+            Input:  pandas DataFrame with a column named 'text'
+            Output: pandas DataFrame with columns 'label_id' and 'label'
+            """
+
+            def load_context(self, context):
+                import json
+                import os
+
+                import torch
+                from transformers import AutoModelForSequenceClassification, AutoTokenizer
+
+                model_dir = context.artifacts["model_dir"]
+                self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+                self.tokenizer = AutoTokenizer.from_pretrained(model_dir)
+                self.model = AutoModelForSequenceClassification.from_pretrained(model_dir)
+                self.model.to(self.device)
+                self.model.eval()
+
+                with open(os.path.join(model_dir, "id2label.json")) as f:
+                    self.id2label = {int(k): v for k, v in json.load(f).items()}
+
+            def clean_text(self, text) -> str:
+                import re
+                import string
+
+                text = str(text)
+                text = text.lower()
+                text = re.sub(r"<.*?>", "", text)
+                text = re.sub(r"https?://\S+|www\.\S+", "", text)
+                text = text.replace("'", "")
+                text = text.translate(str.maketrans("", "", string.punctuation))
+                text = re.sub(r"\d+", "", text)
+                return text
+
+            def log_prediction(self, text, prediction):
+                print(f"{text}: {prediction}")
+
+            def predict(self, context, model_input):
+                import torch
+
+                original_texts = model_input["text"].tolist()
+                texts = list(map(self.clean_text, original_texts))
+                encodings = self.tokenizer(
+                    texts,
+                    max_length=128,
+                    padding="max_length",
+                    truncation=True,
+                    return_tensors="pt",
+                )
+                input_ids = encodings["input_ids"].to(self.device)
+                attention_mask = encodings["attention_mask"].to(self.device)
+
+                with torch.no_grad():
+                    logits = self.model(
+                        input_ids=input_ids,
+                        attention_mask=attention_mask,
+                    ).logits
+
+                prob = torch.softmax(logits, dim=1).cpu().numpy().tolist()
+
+                for i in range(len(original_texts)):
+                    self.log_prediction(original_texts[i], prob[i])
+                return prob
+
+
+
+        MODEL_NAME = os.environ["MODEL_NAME"]
+        MLFLOW_URI = os.environ["MLFLOW_TRACKING_URI"]
+        REGISTERED_MODEL = os.environ["REGISTERED_MODEL_NAME"]
+        EPOCHS = 0
+        BATCH_SIZE = int(os.environ["BATCH_SIZE"])
+        LEARNING_RATE = float(os.environ["LEARNING_RATE"])
+        MAX_LEN = int(os.environ["MAX_LEN"])
+        WEIGHT_DECAY = float(os.environ["WEIGHT_DECAY"])
+        EXPERIMENT_NAME = os.environ["EXPERIMENT_NAME"]
+        OUTPUT_PATH = os.environ["OUTPUT_PATH"]
+
+        SEED = 42
+        ID2LABEL = {0: "Normal", 1: "Anxiety", 2: "Depression", 3: "Suicidal"}
+
+        os.makedirs(OUTPUT_PATH, exist_ok=True)
+        best_model_path = os.path.join(OUTPUT_PATH, "best_model")
+
+        # MLflow: restore soft-deleted experiment if needed
+        mlflow.set_tracking_uri(MLFLOW_URI)
+        mlflow.set_experiment(EXPERIMENT_NAME)
+
+        # Device
+        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+        # Data
+        cleaned_path = ctx["ti"].xcom_pull(
+            key="cleaned_path", task_ids="load_and_clean_data"
+        )
+        df = pd.read_parquet(cleaned_path)
+        x, y = df["text"].tolist(), df["status_id"].tolist()
+        x_train, x_val, y_train, y_val = train_test_split(
+            x, y, test_size=0.1, stratify=y, random_state=SEED
+        )
+        tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME)
+
+        train_loader = DataLoader(
+            MentalHealthDataset(x_train, y_train, tokenizer, MAX_LEN),
+            batch_size=BATCH_SIZE,
+            shuffle=True,
+        )
+        val_loader = DataLoader(
+            MentalHealthDataset(x_val, y_val, tokenizer, MAX_LEN),
+            batch_size=BATCH_SIZE,
+        )
+        print(f"Train batches: {len(train_loader)} | Val batches: {len(val_loader)}")
+
+        # Warm start: load Production model if available
+        print(f"Cold start: loading {MODEL_NAME}")
+        model = AutoModelForSequenceClassification.from_pretrained(
+            MODEL_NAME, num_labels=4
+        ).to(device)
+
+        optimizer = optim.AdamW(
+            model.parameters(), lr=LEARNING_RATE, weight_decay=WEIGHT_DECAY
+        )
+        drift_share = (
+            ctx["ti"].xcom_pull(key="drift_share", task_ids="detect_data_drift") or 0.0
+        )
+        f1 = 0.0
+
+        with mlflow.start_run(run_name=f"quarterly_retrain_{ctx['ds_nodash']}") as run:
+            mlflow.log_params(
+                {
+                    "model_base": MODEL_NAME,
+                    "n_epochs": EPOCHS,
+                    "batch_size": BATCH_SIZE,
+                    "learning_rate": LEARNING_RATE,
+                    "weight_decay": WEIGHT_DECAY,
+                    "max_len": MAX_LEN,
+                    "train_rows": len(x_train),
+                    "val_rows": len(x_val),
+                    "drift_share": drift_share,
+                    "device": str(device),
+                }
+            )
+
+            best_val_loss = float("inf")
+            model.save_pretrained(best_model_path)
+            tokenizer.save_pretrained(best_model_path)
+            with open(os.path.join(best_model_path, "id2label.json"), "w") as f:
+                json.dump(ID2LABEL, f)
+
+            # Problem with training but i cant identify
+            for epoch in range(EPOCHS):
+                print(f"\n── Epoch {epoch + 1}/{EPOCHS} starting ──")
+
+                # Train
+                model.train()
+                train_loss = 0.0
+                for i, batch in enumerate(train_loader):
+                    optimizer.zero_grad()
+                    out = model(
+                        batch["input_ids"].to(device),
+                        attention_mask=batch["attention_mask"].to(device),
+                        labels=batch["labels"].to(device),
+                    )
+                    out.loss.backward()
+                    optimizer.step()
+                    train_loss += out.loss.item()
+                    if (i + 1) % 100 == 0:
+                        print(
+                            f"  [train] batch {i + 1}/{len(train_loader)}  "
+                            f"loss={out.loss.item():.4f}"
+                        )
+
+                # Validate
+                model.eval()
+                val_loss, all_preds, all_labels = 0.0, [], []
+                with torch.no_grad():
+                    for batch in val_loader:
+                        out = model(
+                            batch["input_ids"].to(device),
+                            attention_mask=batch["attention_mask"].to(device),
+                            labels=batch["labels"].to(device),
+                        )
+                        val_loss += out.loss.item()
+                        all_preds.extend(torch.argmax(out.logits, dim=1).cpu().numpy())
+                        all_labels.extend(batch["labels"].numpy())
+
+                avg_train = train_loss / len(train_loader)
+                avg_val = val_loss / len(val_loader)
+                acc = accuracy_score(all_labels, all_preds)
+                f1 = f1_score(all_labels, all_preds, average="macro")
+
+                print(
+                    f"Epoch {epoch + 1}/{EPOCHS}  "
+                    f"train_loss={avg_train:.4f}  "
+                    f"val_loss={avg_val:.4f}  "
+                    f"acc={acc:.4f}  "
+                    f"macro_f1={f1:.4f}"
+                )
+
+                mlflow.log_metrics(
+                    {
+                        "train_loss": avg_train,
+                        "val_loss": avg_val,
+                        "val_accuracy": acc,
+                        "val_macro_f1": f1,
+                    },
+                    step=epoch,
+                )
+
+                if avg_val < best_val_loss:
+                    best_val_loss = avg_val
+                    model.save_pretrained(best_model_path)
+                    tokenizer.save_pretrained(best_model_path)
+                    with open(os.path.join(best_model_path, "id2label.json"), "w") as f:
+                        json.dump(ID2LABEL, f)
+                    print("New model saved")
+
+            model = AutoModelForSequenceClassification.from_pretrained(best_model_path)
+            mlflow.log_metric("best_val_loss", best_val_loss)
+
+            drift_report = ctx["ti"].xcom_pull(
+                key="drift_report_path", task_ids="detect_data_drift"
+            )
+            if drift_report and os.path.exists(drift_report):
+                mlflow.log_artifact(drift_report, artifact_path="drift")
+
+            # For deployment
+            artifacts = {"model_dir": best_model_path}
+            conda_env = {
+                "channels": ["defaults", "conda-forge"],
+                "dependencies": [
+                    "python=3.10",
+                    "pip",
+                    {
+                        "pip": [
+                            "mlflow>=3.10",
+                            "torch==2.10",
+                            "transformers>=4.38",
+                            "pandas",
+                            "numpy==2.0.2",
+                            "scikit-learn==1.6.1",
+                        ]
+                    },
+                ],
+                "name": "mental_health_classification_env",
+            }
+
+            print("Uploading model to MLflow (S3 artifact store)...")
+
+            model_info = mlflow.pyfunc.log_model(
+                artifact_path="bert_sentiment_model",
+                python_model=BertSentimentWrapper(),
+                artifacts=artifacts,
+                infer_code_paths=True,
+                conda_env=conda_env,
+                registered_model_name=REGISTERED_MODEL,
+            )
+            print("Model uploaded ✅")
+
+            ctx["ti"].xcom_push(
+                key="new_model_version", value=model_info.registered_model_version
+            )
+            ctx["ti"].xcom_push(key="new_run_id", value=run.info.run_id)
+            print(f"Run complete → run_id={run.info.run_id}")
+
 
     retrain_task = PythonOperator(
         task_id="retrain_model",
