@@ -10,7 +10,7 @@ def evaluate_and_promote(**ctx):
     MLFLOW_URI = os.environ["MLFLOW_TRACKING_URI"]
     REGISTERED_MODEL_NAME = os.environ["REGISTERED_MODEL_NAME"]
     TEST_CSV = os.environ["TEST_PATH"]
-    REF_PATH = os.environ["REFERENCE_PATH"]
+    REF_PATH = os.environ["REF_PATH"]
 
     mlflow.set_tracking_uri(MLFLOW_URI)
     client = mlflow.tracking.MlflowClient()
