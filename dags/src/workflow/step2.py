@@ -35,3 +35,8 @@ def detect_drift(**ctx):
     ctx["ti"].xcom_push(key="drift_detected", value=drift_detected)
     ctx["ti"].xcom_push(key="drift_share", value=share)
     ctx["ti"].xcom_push(key="drift_report_path", value=REPORT_PATH)
+
+def data_drift_check(**ctx):
+    return ctx["ti"].xcom_pull(
+        key="drift_detected", task_ids="detect_data_drift"
+    )
