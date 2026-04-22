@@ -11,7 +11,7 @@ from __future__ import annotations
 from datetime import datetime, timedelta
 
 from airflow import DAG
-from airflow.operators.python import PythonOperator
+from airflow.operators.python import PythonOperator, ShortCircuitOperator
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -41,11 +41,15 @@ with DAG(
     )
 
     # Detect data drift
-    from src.workflow.step2 import detect_drift
+    from src.workflow.step2 import detect_drift, data_drift_check
 
     drift_task = PythonOperator(
         task_id="detect_data_drift",
         python_callable=detect_drift,
+    )
+    drift_check = ShortCircuitOperator(
+        task_id="data_drift_check",
+        python_callable=data_drift_check
     )
 
     # Retrain DistilBERT
@@ -340,13 +344,18 @@ with DAG(
     )
 
     # Evaluate & promote
-    from src.workflow.step4 import evaluate_and_promote
+    from src.workflow.step4 import evaluate_and_promote, new_production_check
 
     evaluate_task = PythonOperator(
         task_id="evaluate_and_promote",
         python_callable=evaluate_and_promote,
         execution_timeout=timedelta(hours=2),
     )
+    production_check = ShortCircuitOperator(
+        task_id="new_production_check",
+        python_callable=new_production_check
+    )
+
 
     from src.workflow.step5 import update_deployment
 
@@ -356,4 +365,4 @@ with DAG(
         execution_timeout=timedelta(hours=2),
     )
 
-    load_task >> drift_task >> retrain_task >> evaluate_task >> update_deployment
+    load_task >> drift_task >> drift_check >> retrain_task >> evaluate_task >> production_check >> update_deployment
