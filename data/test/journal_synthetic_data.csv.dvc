@@ -1,0 +1,5 @@
+outs:
+- md5: c1436ed7e58932c822a436e2aebab314
+  size: 4267
+  hash: md5
+  path: journal_synthetic_data.csv
