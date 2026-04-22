@@ -46,11 +46,11 @@ def evaluate_and_promote(**ctx):
         client.set_registered_model_alias(
             name=REGISTERED_MODEL_NAME, alias="production", version=new_model_version
         )
-        ctx["ti"].xcom_push(key="deploy", value=True)
+        ctx["ti"].xcom_push(key="is_new_production", value=True)
         pd.read_parquet(
             ctx["ti"].xcom_pull(key="cleaned_path", task_ids="load_and_clean_data")
         ).to_parquet(REF_PATH, index=False)
         print(f"Reference data updated → {REF_PATH}")
     else:
-        ctx["ti"].xcom_push(key="deploy", value=False)
+        ctx["ti"].xcom_push(key="is_new_production", value=False)
         print(f"New F1 ({new_f1:.4f}) < production ({prod_f1:.4f}) — no promotion.")
