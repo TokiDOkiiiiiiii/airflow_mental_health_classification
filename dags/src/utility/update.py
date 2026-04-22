@@ -19,6 +19,7 @@ def update_deployment_endpoint():
     config = dict(
         assume_role_arn=ROLE_ARN,
         region_name=REGION_NAME,
+        timeout_seconds=3600,
         mode="replace",
     )
     client = get_deploy_client("sagemaker")
