@@ -2,6 +2,5 @@
 .DS_Store
 note
 __pycache__
-data/*
 data_ref/*
 logs/*
