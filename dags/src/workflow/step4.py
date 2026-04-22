@@ -25,11 +25,13 @@ def evaluate_and_promote(**ctx):
         f"models:/{REGISTERED_MODEL_NAME}/{str(new_model_version)}"
     )
     new_f1 = score_model(new_model, test_df)
+    del new_model
     print(f"New model test macro-F1: {new_f1:.4f}")
 
     prod_f1 = 0.0
     prod_model = mlflow.pyfunc.load_model(f"models:/{REGISTERED_MODEL_NAME}@production")
     prod_f1 = score_model(prod_model, test_df)
+    del prod_model
     print(f"Production model test macro-F1: {prod_f1:.4f}")
 
     with mlflow.start_run(run_id=new_run_id):
