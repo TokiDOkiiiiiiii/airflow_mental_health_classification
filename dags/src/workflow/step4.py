@@ -54,3 +54,6 @@ def evaluate_and_promote(**ctx):
     else:
         ctx["ti"].xcom_push(key="is_new_production", value=False)
         print(f"New F1 ({new_f1:.4f}) < production ({prod_f1:.4f}) — no promotion.")
+
+def new_production_check(**ctx):
+    return ctx["ti"].xcom_pull(key="is_new_production", task_ids="evaluate_and_promote")
