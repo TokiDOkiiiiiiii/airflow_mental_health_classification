@@ -146,7 +146,7 @@ with DAG(
         OUTPUT_PATH = os.environ["OUTPUT_PATH"]
 
         SEED = 42
-        ID2LABEL = {0: "Normal", 1: "Anxiety", 2: "Depression", 3: "Suicidal"}
+        ID2LABEL = {0: "Normal", 1: "Negative", 2: "Very Negative", 3: "Suicidal"}
 
         os.makedirs(OUTPUT_PATH, exist_ok=True)
         best_model_path = os.path.join(OUTPUT_PATH, "best_model")
