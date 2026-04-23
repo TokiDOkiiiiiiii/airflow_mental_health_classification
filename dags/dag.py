@@ -61,7 +61,7 @@ with DAG(
         import pandas as pd
         import torch
         import torch.optim as optim
-        from sklearn.metrics import accuracy_score, f1_score
+        from sklearn.metrics import accuracy_score, f1_score, classification_report
         from sklearn.model_selection import train_test_split
         from torch.utils.data import DataLoader
         from transformers import AutoModelForSequenceClassification, AutoTokenizer
@@ -261,6 +261,18 @@ with DAG(
                 avg_val = val_loss / len(val_loader)
                 acc = accuracy_score(all_labels, all_preds)
                 f1 = f1_score(all_labels, all_preds, average="macro")
+                report = classification_report(
+                    all_labels, all_preds,
+                    target_names=list(LABEL2ID.keys()),
+                    output_dict=True,
+                )
+                for label_name in LABEL2ID:
+                    if label_name in report:
+                        mlflow.log_metrics({
+                            f"{label_name}_precision": report[label_name]["precision"],
+                            f"{label_name}_recall": report[label_name]["recall"],
+                            f"{label_name}_f1": report[label_name]["f1-score"],
+                        })
 
                 print(
                     f"Epoch {epoch + 1}/{EPOCHS}  "
