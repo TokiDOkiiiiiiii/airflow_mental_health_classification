@@ -16,7 +16,7 @@ def detect_drift(**ctx):
 
     if not os.path.exists(REF_PATH):
         print("No reference data — first run, skipping drift check.")
-        ctx["ti"].xcom_push(key="drift_detected", value=False)
+        ctx["ti"].xcom_push(key="drift_detected", value=True)
         ctx["ti"].xcom_push(key="drift_share", value=0.0)
         return
 
