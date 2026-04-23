@@ -22,7 +22,7 @@ def detect_drift(**ctx):
 
     ref_df = pd.read_parquet(REF_PATH)
     report = Report(metrics=[DataDriftPreset()])
-    report.run(reference_data=ref_df[["text"]], current_data=current_df[["text"]])
+    report.run(reference_data=ref_df[["status_id"]], current_data=current_df[["status_id"]])
 
     report.save_html(REPORT_PATH)
     result = report.as_dict()
