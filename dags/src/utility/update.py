@@ -20,7 +20,7 @@ def update_deployment_endpoint(model_version):
         assume_role_arn=ROLE_ARN,
         region_name=REGION_NAME,
         timeout_seconds=3600,
-        variant_name=f"{REGISTERED_MODEL_NAME}+{str(model_version)}",
+        variant_name=f"{REGISTERED_MODEL_NAME}-{str(model_version)}",
         mode="replace",
     )
     client = get_deploy_client("sagemaker")
