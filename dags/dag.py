@@ -141,7 +141,7 @@ with DAG(
         MODEL_NAME = os.environ["MODEL_NAME"]
         MLFLOW_URI = os.environ["MLFLOW_TRACKING_URI"]
         REGISTERED_MODEL = os.environ["REGISTERED_MODEL_NAME"]
-        EPOCHS = 0
+        EPOCHS = os.environ["EPOCHS"]
         BATCH_SIZE = int(os.environ["BATCH_SIZE"])
         LEARNING_RATE = float(os.environ["LEARNING_RATE"])
         MAX_LEN = int(os.environ["MAX_LEN"])
