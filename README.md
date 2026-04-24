@@ -6,6 +6,7 @@
 - Step2. Check data drift
 - Step3. Retrain model
 - Step4. Evaluate and promote model
+- Step5. Deploy model
 
 ## Utility function
 
